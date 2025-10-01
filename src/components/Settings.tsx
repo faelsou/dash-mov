@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   Settings as SettingsIcon, 
   Database, 
@@ -16,14 +16,27 @@ import {
   Moon,
   Sun,
   Plus,
-  Trash2
+  Trash2,
+  Pencil,
+  AlertTriangle
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
+
+type ManagedUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: 'executivo' | 'secretaria' | 'operacional';
+  status: 'Ativo' | 'Inativo';
+  password: string;
+};
 
 export const Settings: React.FC = () => {
   const [activeTab, setActiveTab] = useState('connection');
   const [showApiKey, setShowApiKey] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const { user } = useAuth();
   const [settings, setSettings] = useState({
     apiKey: '',
     sheetId: '1HJxcgh4yJit10flPdHcLWkSH34CGLLU4MLV8GhEOKGs',
@@ -34,13 +47,22 @@ export const Settings: React.FC = () => {
     theme: theme,
     displayMode: 'monitor'
   });
-  const [users, setUsers] = useState([
-    { id: '1', name: 'João Executivo', email: 'executivo@moveis.com', role: 'executivo', status: 'Ativo' },
-    { id: '2', name: 'Maria Secretária', email: 'secretaria@moveis.com', role: 'secretaria', status: 'Ativo' },
-    { id: '3', name: 'Carlos Operacional', email: 'operacional@moveis.com', role: 'operacional', status: 'Ativo' }
+  const [users, setUsers] = useState<ManagedUser[]>([
+    { id: '1', name: 'João Executivo', email: 'executivo@moveis.com', role: 'executivo', status: 'Ativo', password: 'exec123' },
+    { id: '2', name: 'Maria Secretária', email: 'secretaria@moveis.com', role: 'secretaria', status: 'Ativo', password: 'sec123' },
+    { id: '3', name: 'Carlos Operacional', email: 'operacional@moveis.com', role: 'operacional', status: 'Ativo', password: 'op123' }
   ]);
-  const [newUser, setNewUser] = useState({ name: '', email: '', role: 'operacional' });
+  const [newUser, setNewUser] = useState({
+    name: '',
+    email: '',
+    role: 'operacional' as ManagedUser['role'],
+    password: '',
+    status: 'Ativo' as ManagedUser['status']
+  });
   const [showAddUser, setShowAddUser] = useState(false);
+  const [showNewUserPassword, setShowNewUserPassword] = useState(false);
+  const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
+  const [showEditingPassword, setShowEditingPassword] = useState(false);
 
   const tabs = [
     { id: 'connection', name: 'Conexão', icon: Database },
@@ -49,6 +71,8 @@ export const Settings: React.FC = () => {
     { id: 'security', name: 'Segurança', icon: Shield },
     { id: 'display', name: 'Exibição', icon: Monitor }
   ];
+
+  const canManageUsers = useMemo(() => user?.role === 'executivo', [user]);
 
   const handleSave = () => {
     // Salvar configurações no localStorage
@@ -71,20 +95,49 @@ export const Settings: React.FC = () => {
   };
 
   const addUser = () => {
-    if (newUser.name && newUser.email) {
-      const user = {
+    if (!canManageUsers) {
+      return;
+    }
+
+    if (newUser.name && newUser.email && newUser.password) {
+      const userToAdd: ManagedUser = {
         id: Date.now().toString(),
-        ...newUser,
-        status: 'Ativo'
+        ...newUser
       };
-      setUsers([...users, user]);
-      setNewUser({ name: '', email: '', role: 'operacional' });
+      setUsers([...users, userToAdd]);
+      setNewUser({ name: '', email: '', role: 'operacional', password: '', status: 'Ativo' });
+      setShowNewUserPassword(false);
       setShowAddUser(false);
     }
   };
 
   const removeUser = (id: string) => {
+    if (!canManageUsers) {
+      return;
+    }
+
     setUsers(users.filter(user => user.id !== id));
+  };
+
+  const startEditUser = (userToEdit: ManagedUser) => {
+    if (!canManageUsers) {
+      return;
+    }
+
+    setEditingUser({ ...userToEdit });
+    setShowEditingPassword(false);
+  };
+
+  const saveEditedUser = () => {
+    if (!canManageUsers || !editingUser) {
+      return;
+    }
+
+    if (editingUser.name && editingUser.email && editingUser.password) {
+      setUsers(users.map(userItem => userItem.id === editingUser.id ? editingUser : userItem));
+      setEditingUser(null);
+      setShowEditingPassword(false);
+    }
   };
 
   const getRoleColor = (role: string) => {
@@ -205,13 +258,25 @@ export const Settings: React.FC = () => {
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Usuários do Sistema</h3>
         <button
-          onClick={() => setShowAddUser(true)}
-          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          onClick={() => canManageUsers && setShowAddUser(true)}
+          disabled={!canManageUsers}
+          className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+            canManageUsers
+              ? 'bg-blue-600 text-white hover:bg-blue-700'
+              : 'bg-gray-200 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-400'
+          }`}
         >
           <Plus className="w-4 h-4" />
           <span>Adicionar Usuário</span>
         </button>
       </div>
+
+      {!canManageUsers && (
+        <div className="flex items-center space-x-3 rounded-lg border border-yellow-200 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/10 px-4 py-3 text-yellow-800 dark:text-yellow-200">
+          <AlertTriangle className="w-5 h-5" />
+          <p className="text-sm">Somente usuários executivos podem gerenciar usuários e senhas.</p>
+        </div>
+      )}
 
       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
         <div className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -236,12 +301,22 @@ export const Settings: React.FC = () => {
                   <Check className="w-4 h-4" />
                   <span className="text-sm">{user.status}</span>
                 </span>
-                <button
-                  onClick={() => removeUser(user.id)}
-                  className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                {canManageUsers && (
+                  <>
+                    <button
+                      onClick={() => startEditUser(user)}
+                      className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => removeUser(user.id)}
+                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           ))}
@@ -249,7 +324,7 @@ export const Settings: React.FC = () => {
       </div>
 
       {/* Add User Modal */}
-      {showAddUser && (
+      {showAddUser && canManageUsers && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Adicionar Usuário</h3>
@@ -276,12 +351,41 @@ export const Settings: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Função</label>
                 <select
                   value={newUser.role}
-                  onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+                  onChange={(e) => setNewUser({...newUser, role: e.target.value as ManagedUser['role']})}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 >
                   <option value="operacional">Operacional</option>
                   <option value="secretaria">Secretaria</option>
                   <option value="executivo">Executivo</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Senha</label>
+                <div className="relative">
+                  <input
+                    type={showNewUserPassword ? 'text' : 'password'}
+                    value={newUser.password}
+                    onChange={(e) => setNewUser({...newUser, password: e.target.value})}
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewUserPassword(!showNewUserPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                  >
+                    {showNewUserPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
+                <select
+                  value={newUser.status}
+                  onChange={(e) => setNewUser({...newUser, status: e.target.value as ManagedUser['status']})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                >
+                  <option value="Ativo">Ativo</option>
+                  <option value="Inativo">Inativo</option>
                 </select>
               </div>
             </div>
@@ -297,6 +401,98 @@ export const Settings: React.FC = () => {
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 Adicionar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {editingUser && canManageUsers && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Editar Usuário</h3>
+              <button
+                onClick={() => setEditingUser(null)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nome</label>
+                <input
+                  type="text"
+                  value={editingUser.name}
+                  onChange={(e) => setEditingUser(prev => prev ? { ...prev, name: e.target.value } : prev)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={editingUser.email}
+                  onChange={(e) => setEditingUser(prev => prev ? { ...prev, email: e.target.value } : prev)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Função</label>
+                <select
+                  value={editingUser.role}
+                  onChange={(e) => setEditingUser(prev => prev ? { ...prev, role: e.target.value as ManagedUser['role'] } : prev)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                >
+                  <option value="operacional">Operacional</option>
+                  <option value="secretaria">Secretaria</option>
+                  <option value="executivo">Executivo</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Senha</label>
+                <div className="relative">
+                  <input
+                    type={showEditingPassword ? 'text' : 'password'}
+                    value={editingUser.password}
+                    onChange={(e) => setEditingUser(prev => prev ? { ...prev, password: e.target.value } : prev)}
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditingPassword(!showEditingPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                  >
+                    {showEditingPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
+                <select
+                  value={editingUser.status}
+                  onChange={(e) => setEditingUser(prev => prev ? { ...prev, status: e.target.value as ManagedUser['status'] } : prev)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                >
+                  <option value="Ativo">Ativo</option>
+                  <option value="Inativo">Inativo</option>
+                </select>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                onClick={() => setEditingUser(null)}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={saveEditedUser}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Salvar Alterações
               </button>
             </div>
           </div>
