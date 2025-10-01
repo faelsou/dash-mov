@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import { 
   Plus, 
@@ -14,7 +14,20 @@ import {
 import { useSheetData } from '../hooks/useSheetData';
 import { KanbanColumn, KanbanCard, ProductionStatus } from '../types';
 import { formatCurrency } from '../utils/calculations';
-import { useTheme } from '../contexts/ThemeContext';
+const STORAGE_KEY = 'production-kanban-state';
+
+const createEmptyColumns = (): Record<ProductionStatus, KanbanCard[]> => ({
+  orcamento: [],
+  aprovado: [],
+  projeto: [],
+  corte: [],
+  usinagem: [],
+  montagem: [],
+  acabamento: [],
+  embalagem: [],
+  entrega: [],
+  finalizado: []
+});
 
 export const KanbanBoard: React.FC = () => {
   const { data, loading } = useSheetData();
@@ -29,19 +42,8 @@ export const KanbanBoard: React.FC = () => {
     responsible: '',
     priority: 'media' as 'alta' | 'media' | 'baixa'
   });
-  const [kanbanColumns, setKanbanColumns] = useState<Record<ProductionStatus, KanbanCard[]>>({
-    orcamento: [],
-    aprovado: [],
-    projeto: [],
-    corte: [],
-    usinagem: [],
-    montagem: [],
-    acabamento: [],
-    embalagem: [],
-    entrega: [],
-    finalizado: []
-  });
-  const { theme } = useTheme();
+  const [kanbanColumns, setKanbanColumns] = useState<Record<ProductionStatus, KanbanCard[]>>(createEmptyColumns);
+  const [initialized, setInitialized] = useState(false);
 
   const statusConfig: Record<ProductionStatus, { title: string; color: string; bgColor: string }> = {
     orcamento: { title: 'Orçamento', color: 'text-yellow-700 dark:text-yellow-300', bgColor: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700' },
@@ -72,19 +74,17 @@ export const KanbanBoard: React.FC = () => {
     return statusMap[status] || 'orcamento';
   };
 
-  useMemo(() => {
-    const columns: Record<ProductionStatus, KanbanCard[]> = {
-      orcamento: [],
-      aprovado: [],
-      projeto: [],
-      corte: [],
-      usinagem: [],
-      montagem: [],
-      acabamento: [],
-      embalagem: [],
-      entrega: [],
-      finalizado: []
-    };
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    if (!data.length) {
+      return;
+    }
+
+    const baseColumns = createEmptyColumns();
+    const cardsMap = new Map<string, KanbanCard>();
 
     data.forEach((item, index) => {
       const productionStatus = mapStatusToProduction(item.Status);
@@ -96,14 +96,73 @@ export const KanbanBoard: React.FC = () => {
         startDate: item["Data Início"] || '',
         deliveryDate: item["Data Prevista Entrega"] || '',
         priority: item["Valor Final (R$)"] > 50000 ? 'alta' : item["Valor Final (R$)"] > 25000 ? 'media' : 'baixa',
-        responsible: item["Vendedor Responsável"] || 'Não atribuído'
+        responsible: item["Vendedor Responsável"] || 'Não atribuído',
+        status: productionStatus
       };
-      
-      columns[productionStatus].push(card);
+
+      baseColumns[productionStatus].push(card);
+      cardsMap.set(card.id, card);
     });
 
-    setKanbanColumns(columns);
+    const savedState = localStorage.getItem(STORAGE_KEY);
+
+    if (savedState) {
+      try {
+        const parsed = JSON.parse(savedState) as Partial<Record<ProductionStatus, string[]>>;
+        const restoredColumns = createEmptyColumns();
+        const assignedCards = new Set<string>();
+
+        (Object.keys(parsed) as ProductionStatus[]).forEach(status => {
+          (parsed[status] || []).forEach(cardId => {
+            const card = cardsMap.get(cardId);
+            if (card) {
+              restoredColumns[status].push({ ...card, status });
+              assignedCards.add(cardId);
+            }
+          });
+        });
+
+        (Object.keys(baseColumns) as ProductionStatus[]).forEach(status => {
+          baseColumns[status].forEach(card => {
+            if (!assignedCards.has(card.id)) {
+              restoredColumns[status].push({ ...card, status });
+              assignedCards.add(card.id);
+            }
+          });
+        });
+
+        setKanbanColumns(restoredColumns);
+        setSelectedCard(null);
+        setInitialized(true);
+        return;
+      } catch (error) {
+        console.error('Erro ao restaurar o kanban de produção:', error);
+      }
+    }
+
+    setKanbanColumns(baseColumns);
+    setSelectedCard(null);
+    setInitialized(true);
   }, [data]);
+
+  useEffect(() => {
+    if (!initialized) {
+      return;
+    }
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const serialized = JSON.stringify(
+      Object.entries(kanbanColumns).reduce((acc, [status, cards]) => {
+        acc[status as ProductionStatus] = cards.map(card => card.id);
+        return acc;
+      }, {} as Record<ProductionStatus, string[]>)
+    );
+
+    localStorage.setItem(STORAGE_KEY, serialized);
+  }, [kanbanColumns, initialized]);
 
   const kanbanData = useMemo(() => {
     return Object.entries(kanbanColumns).map(([status, cards]) => ({
@@ -111,7 +170,7 @@ export const KanbanBoard: React.FC = () => {
       title: statusConfig[status as ProductionStatus].title,
       color: statusConfig[status as ProductionStatus].color,
       bgColor: statusConfig[status as ProductionStatus].bgColor,
-      cards: cards.sort((a, b) => {
+      cards: cards.slice().sort((a, b) => {
         const priorityOrder = { alta: 3, media: 2, baixa: 1 };
         return priorityOrder[b.priority] - priorityOrder[a.priority];
       })
@@ -139,13 +198,18 @@ export const KanbanBoard: React.FC = () => {
       const destCards = sourceColumn === destColumn ? sourceCards : [...newColumns[destColumn]];
 
       const [movedCard] = sourceCards.splice(source.index, 1);
-      destCards.splice(destination.index, 0, movedCard);
+      const updatedCard: KanbanCard = { ...movedCard, status: destColumn };
+      destCards.splice(destination.index, 0, updatedCard);
 
       newColumns[sourceColumn] = sourceCards;
       newColumns[destColumn] = destCards;
 
       return newColumns;
     });
+
+    if (selectedCard?.id === draggableId) {
+      setSelectedCard(prev => (prev ? { ...prev, status: destColumn } : prev));
+    }
   };
 
   const getPriorityColor = (priority: string) => {
@@ -224,7 +288,11 @@ export const KanbanBoard: React.FC = () => {
               </div>
 
               {/* Cards */}
-              <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto">
+              <div
+                className={`space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto rounded-xl border border-transparent transition-all p-1 ${
+                  snapshot.isDraggingOver ? 'border-blue-400/60 bg-blue-500/5 dark:bg-blue-500/10 shadow-inner' : ''
+                }`}
+              >
                 {column.cards.map((card, index) => (
                   <Draggable key={card.id} draggableId={card.id} index={index}>
                     {(provided, snapshot) => (
@@ -307,21 +375,27 @@ export const KanbanBoard: React.FC = () => {
             </div>
 
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Valor</label>
-                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{formatCurrency(selectedCard.value)}</p>
-                </div>
-                <div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Valor</label>
+                        <p className="text-lg font-semibold text-gray-900 dark:text-white">{formatCurrency(selectedCard.value)}</p>
+                      </div>
+                      <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Prioridade</label>
-                  <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(selectedCard.priority)}`}>
-                    {getPriorityIcon(selectedCard.priority)}
-                    <span className="capitalize">{selectedCard.priority}</span>
-                  </div>
-                </div>
-              </div>
+                        <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(selectedCard.priority)}`}>
+                          {getPriorityIcon(selectedCard.priority)}
+                          <span className="capitalize">{selectedCard.priority}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status atual</label>
+                        <p className="text-gray-900 dark:text-white">
+                          {statusConfig[selectedCard.status].title}
+                        </p>
+                      </div>
+                    </div>
 
-              <div>
+                    <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data de Início</label>
                 <p className="text-gray-900 dark:text-white">{selectedCard.startDate}</p>
               </div>
@@ -461,9 +535,10 @@ export const KanbanBoard: React.FC = () => {
                       startDate: newProject.startDate,
                       deliveryDate: newProject.deliveryDate,
                       priority: newProject.priority,
-                      responsible: newProject.responsible
+                      responsible: newProject.responsible,
+                      status: 'orcamento'
                     };
-                    
+
                     setKanbanColumns(prev => ({
                       ...prev,
                       orcamento: [...prev.orcamento, project]
