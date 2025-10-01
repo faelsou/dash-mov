@@ -27,7 +27,7 @@ type ManagedUser = {
   id: string;
   name: string;
   email: string;
-  role: 'executivo' | 'secretaria' | 'operacional';
+  role: 'executivo' | 'vendedor' | 'operacional';
   status: 'Ativo' | 'Inativo';
   password: string;
 };
@@ -49,7 +49,7 @@ export const Settings: React.FC = () => {
   });
   const [users, setUsers] = useState<ManagedUser[]>([
     { id: '1', name: 'João Executivo', email: 'executivo@moveis.com', role: 'executivo', status: 'Ativo', password: 'exec123' },
-    { id: '2', name: 'Maria Secretária', email: 'secretaria@moveis.com', role: 'secretaria', status: 'Ativo', password: 'sec123' },
+    { id: '2', name: 'Maria Vendedora', email: 'vendedor@moveis.com', role: 'vendedor', status: 'Ativo', password: 'vend123' },
     { id: '3', name: 'Carlos Operacional', email: 'operacional@moveis.com', role: 'operacional', status: 'Ativo', password: 'op123' }
   ]);
   const [newUser, setNewUser] = useState({
@@ -143,7 +143,7 @@ export const Settings: React.FC = () => {
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'executivo': return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300';
-      case 'secretaria': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300';
+      case 'vendedor': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300';
       case 'operacional': return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300';
       default: return 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300';
     }
@@ -355,7 +355,7 @@ export const Settings: React.FC = () => {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 >
                   <option value="operacional">Operacional</option>
-                  <option value="secretaria">Secretaria</option>
+                  <option value="vendedor">Vendedor</option>
                   <option value="executivo">Executivo</option>
                 </select>
               </div>
@@ -447,7 +447,7 @@ export const Settings: React.FC = () => {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 >
                   <option value="operacional">Operacional</option>
-                  <option value="secretaria">Secretaria</option>
+                  <option value="vendedor">Vendedor</option>
                   <option value="executivo">Executivo</option>
                 </select>
               </div>

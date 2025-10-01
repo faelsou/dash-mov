@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  DollarSign, 
-  TrendingUp, 
-  Users, 
+import {
+  DollarSign,
+  TrendingUp,
+  Users,
   ShoppingBag, 
   Target,
   RefreshCw,
@@ -14,18 +14,20 @@ import {
 import { useSheetData } from '../hooks/useSheetData';
 import { KPICard } from './KPICard';
 import { DateFilter } from './DateFilter';
+import { ExecutiveFilters } from './ExecutiveFilters';
 import { BarChart } from './charts/BarChart';
 import { PieChart } from './charts/PieChart';
 import { StatusTable } from './StatusTable';
-import { 
-  calculateKPIs, 
-  formatCurrency, 
+import {
+  calculateKPIs,
+  formatCurrency,
   formatPercentage,
   getSalesByVendor,
   getSalesByCity,
   getSalesByPaymentMethod,
   getSalesByStatus,
-  filterDataByDateRange
+  filterDataByDateRange,
+  filterDataByMonth
 } from '../utils/calculations';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -39,10 +41,106 @@ export const Dashboard: React.FC<DashboardProps> = ({ onPageChange }) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState('all');
+  const [selectedVendor, setSelectedVendor] = useState('all');
+  const [selectedCity, setSelectedCity] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [selectedPayment, setSelectedPayment] = useState('all');
+
+  const isExecutive = user?.role === 'executivo';
+
+  const monthOptions = useMemo(() => {
+    const months = new Set<string>();
+
+    data.forEach(item => {
+      const rawDate = item["Data Início"];
+      if (!rawDate) {
+        return;
+      }
+
+      const parts = rawDate.split('/');
+      if (parts.length !== 3) {
+        return;
+      }
+
+      const [, month, year] = parts;
+      if (!month || !year) {
+        return;
+      }
+
+      const normalizedMonth = `${year}-${month.padStart(2, '0')}`;
+      months.add(normalizedMonth);
+    });
+
+    return Array.from(months).sort((a, b) => b.localeCompare(a));
+  }, [data]);
+
+  const vendorOptions = useMemo(() => {
+    const options = new Set<string>();
+    data.forEach(item => {
+      const vendor = item["Vendedor Responsável"]?.trim();
+      if (vendor) {
+        options.add(vendor);
+      }
+    });
+    return Array.from(options).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [data]);
+
+  const cityOptions = useMemo(() => {
+    const options = new Set<string>();
+    data.forEach(item => {
+      const city = item.Cidade?.trim();
+      if (city) {
+        options.add(city);
+      }
+    });
+    return Array.from(options).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [data]);
+
+  const statusOptions = useMemo(() => {
+    const options = new Set<string>();
+    data.forEach(item => {
+      const status = item.Status?.trim();
+      if (status) {
+        options.add(status);
+      }
+    });
+    return Array.from(options).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [data]);
+
+  const paymentOptions = useMemo(() => {
+    const options = new Set<string>();
+    data.forEach(item => {
+      const payment = item["Forma de Pagamento"]?.trim();
+      if (payment) {
+        options.add(payment);
+      }
+    });
+    return Array.from(options).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [data]);
 
   const filteredData = useMemo(() => {
-    return filterDataByDateRange(data, startDate, endDate);
-  }, [data, startDate, endDate]);
+    let result = filterDataByDateRange(data, startDate, endDate);
+    result = filterDataByMonth(result, selectedMonth);
+
+    if (selectedVendor !== 'all') {
+      result = result.filter(item => item["Vendedor Responsável"] === selectedVendor);
+    }
+
+    if (selectedCity !== 'all') {
+      result = result.filter(item => item.Cidade === selectedCity);
+    }
+
+    if (selectedStatus !== 'all') {
+      result = result.filter(item => item.Status === selectedStatus);
+    }
+
+    if (selectedPayment !== 'all') {
+      result = result.filter(item => item["Forma de Pagamento"] === selectedPayment);
+    }
+
+    return result;
+  }, [data, startDate, endDate, selectedMonth, selectedVendor, selectedCity, selectedStatus, selectedPayment]);
 
   const kpis = useMemo(() => calculateKPIs(filteredData), [filteredData]);
   
@@ -54,6 +152,99 @@ export const Dashboard: React.FC<DashboardProps> = ({ onPageChange }) => {
   const handleResetFilters = () => {
     setStartDate('');
     setEndDate('');
+    setSelectedMonth('all');
+    setSelectedVendor('all');
+    setSelectedCity('all');
+    setSelectedStatus('all');
+    setSelectedPayment('all');
+  };
+
+  const handleExport = () => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    if (filteredData.length === 0) {
+      alert('Nenhum dado disponível para exportação com os filtros selecionados.');
+      return;
+    }
+
+    const headers = [
+      'ID Projeto',
+      'Cliente',
+      'Cidade',
+      'Código Projeto',
+      'Data Início',
+      'Data Prevista Entrega',
+      'Valor Final (R$)',
+      'Forma de Pagamento',
+      'Vendedor Responsável',
+      'Status',
+      'Margem Lucro (%)',
+      'Lucro (R$)'
+    ];
+
+    const escapeField = (value: unknown) => {
+      if (value === null || value === undefined) {
+        return '';
+      }
+
+      const stringValue = String(value).replace(/\t/g, ' ').replace(/\r?\n/g, ' ');
+      return stringValue;
+    };
+
+    const rows = filteredData
+      .map(item => [
+        item["ID Projeto"],
+        item.Cliente,
+        item.Cidade,
+        item["Código Projeto"],
+        item["Data Início"],
+        item["Data Prevista Entrega"],
+        item["Valor Final (R$)"],
+        item["Forma de Pagamento"],
+        item["Vendedor Responsável"],
+        item.Status,
+        item["Margem Lucro (%)"],
+        item["Lucro (R$)"]
+      ])
+      .map(row => row.map(escapeField).join('\t'))
+      .join('\n');
+
+    const content = `${headers.join('\t')}\n${rows}`;
+
+    const fileLabel = (() => {
+      if (selectedMonth === 'all') {
+        return 'completo';
+      }
+
+      const [year, month] = selectedMonth.split('-').map(Number);
+      if (!year || !month) {
+        return selectedMonth;
+      }
+
+      const formatted = new Date(year, month - 1, 1).toLocaleDateString('pt-BR', {
+        month: 'long',
+        year: 'numeric'
+      });
+
+      return formatted
+        .normalize('NFD')
+        .replace(/[^a-zA-Z0-9\s-]/g, '')
+        .trim()
+        .replace(/\s+/g, '-')
+        .toLowerCase();
+    })();
+
+    const blob = new Blob([content], { type: 'application/vnd.ms-excel' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `relatorio-vendas-${fileLabel}.xls`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   };
 
   const handleRefresh = async () => {
@@ -166,7 +357,29 @@ export const Dashboard: React.FC<DashboardProps> = ({ onPageChange }) => {
             onStartDateChange={setStartDate}
             onEndDateChange={setEndDate}
             onReset={handleResetFilters}
+            monthOptions={monthOptions}
+            selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
           />
+
+          {isExecutive && (
+            <ExecutiveFilters
+              vendors={vendorOptions}
+              cities={cityOptions}
+              statuses={statusOptions}
+              payments={paymentOptions}
+              selectedVendor={selectedVendor}
+              selectedCity={selectedCity}
+              selectedStatus={selectedStatus}
+              selectedPayment={selectedPayment}
+              onVendorChange={setSelectedVendor}
+              onCityChange={setSelectedCity}
+              onStatusChange={setSelectedStatus}
+              onPaymentChange={setSelectedPayment}
+              onExport={handleExport}
+              isExportDisabled={filteredData.length === 0}
+            />
+          )}
 
           {/* Status da Conexão */}
           {data.length > 0 && (

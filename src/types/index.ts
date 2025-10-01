@@ -40,7 +40,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'executivo' | 'secretaria' | 'operacional';
+  role: 'executivo' | 'vendedor' | 'operacional';
   avatar?: string;
 }
 

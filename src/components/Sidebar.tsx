@@ -24,7 +24,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) =
     switch (role) {
       case 'executivo':
         return ['dashboard', 'kanban', 'leads', 'settings'];
-      case 'secretaria':
+      case 'vendedor':
         return ['dashboard', 'kanban', 'leads'];
       case 'operacional':
         return ['kanban'];

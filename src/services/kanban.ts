@@ -26,7 +26,8 @@ export class KanbanService {
 
   async persistColumns(columns: ColumnState[]): Promise<void> {
     if (!this.client) {
-      throw new Error('Supabase client is not configured.');
+      console.warn('[KanbanService] Supabase client is not configured. Skipping persistence.');
+      return;
     }
 
     const updates = columns.flatMap(column =>

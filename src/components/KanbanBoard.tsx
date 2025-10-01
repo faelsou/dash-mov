@@ -52,6 +52,16 @@ export const KanbanBoard: React.FC = () => {
 
   const kanbanService = useMemo(() => new KanbanService(), []);
 
+  const totalProjects = useMemo(() =>
+    Object.values(kanbanColumns).reduce((sum, cards) => sum + cards.length, 0),
+  [kanbanColumns]);
+
+  const totalValue = useMemo(() =>
+    Object.values(kanbanColumns).reduce((sum, cards) =>
+      sum + cards.reduce((cardSum, card) => cardSum + (card.value || 0), 0),
+    0),
+  [kanbanColumns]);
+
   const statusConfig: Record<ProductionStatus, { title: string; color: string; bgColor: string }> = {
     orcamento: { title: 'Orçamento', color: 'text-yellow-700 dark:text-yellow-300', bgColor: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700' },
     aprovado: { title: 'Aprovado', color: 'text-green-700 dark:text-green-300', bgColor: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700' },
@@ -312,9 +322,12 @@ export const KanbanBoard: React.FC = () => {
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Controle de Produção</h1>
             <p className="text-gray-600 dark:text-gray-300">Acompanhe o status de fabricação dos móveis</p>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-6">
             <div className="text-sm text-gray-500 dark:text-gray-400">
-              Total de projetos: <span className="font-semibold text-gray-900 dark:text-white">{data.length}</span>
+              Total de projetos: <span className="font-semibold text-gray-900 dark:text-white">{totalProjects}</span>
+            </div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              Valor em produção: <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(totalValue)}</span>
             </div>
             <button
               onClick={() => setShowNewProjectModal(true)}
