@@ -1,5 +1,24 @@
 import { SalesData, KPIData, ChartData } from '../types';
 
+const parseSheetDate = (value: string): Date | null => {
+  if (!value) {
+    return null;
+  }
+
+  const parts = value.split('/');
+  if (parts.length !== 3) {
+    return null;
+  }
+
+  const [day, month, year] = parts.map(Number);
+
+  if (!day || !month || !year) {
+    return null;
+  }
+
+  return new Date(year, month - 1, day);
+};
+
 export const calculateKPIs = (data: SalesData[]): KPIData => {
   const totalSales = data.reduce((sum, item) => sum + item["Valor Final (R$)"], 0);
   const totalProjects = data.length;
@@ -106,17 +125,51 @@ export const getSalesByStatus = (data: SalesData[]): ChartData[] => {
 };
 
 export const filterDataByDateRange = (
-  data: SalesData[], 
-  startDate: string, 
+  data: SalesData[],
+  startDate: string,
   endDate: string
 ): SalesData[] => {
-  if (!startDate || !endDate) return data;
-  
+  if (!startDate && !endDate) {
+    return data;
+  }
+
+  const start = startDate ? new Date(startDate) : null;
+  const end = endDate ? new Date(endDate) : null;
+
+  if (end) {
+    end.setHours(23, 59, 59, 999);
+  }
+
   return data.filter(item => {
-    const itemDate = new Date(item["Data Início"].split('/').reverse().join('-'));
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    
-    return itemDate >= start && itemDate <= end;
+    const itemDate = parseSheetDate(item["Data Início"]);
+    if (!itemDate) {
+      return false;
+    }
+
+    if (start && itemDate < start) {
+      return false;
+    }
+
+    if (end && itemDate > end) {
+      return false;
+    }
+
+    return true;
+  });
+};
+
+export const filterDataByMonth = (data: SalesData[], month: string): SalesData[] => {
+  if (month === 'all') {
+    return data;
+  }
+
+  return data.filter(item => {
+    const itemDate = parseSheetDate(item["Data Início"]);
+    if (!itemDate) {
+      return false;
+    }
+
+    const normalized = `${itemDate.getFullYear()}-${String(itemDate.getMonth() + 1).padStart(2, '0')}`;
+    return normalized === month;
   });
 };

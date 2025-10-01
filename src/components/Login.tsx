@@ -21,7 +21,7 @@ export const Login: React.FC = () => {
 
   const demoAccounts = [
     { role: 'Executivo', email: 'executivo@moveis.com', password: 'exec123' },
-    { role: 'Secretaria', email: 'secretaria@moveis.com', password: 'sec123' },
+    { role: 'Vendedor', email: 'vendedor@moveis.com', password: 'vend123' },
     { role: 'Operacional', email: 'operacional@moveis.com', password: 'op123' }
   ];
 

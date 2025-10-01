@@ -15,10 +15,10 @@ const mockUsers: (User & { password: string })[] = [
   },
   {
     id: '2',
-    email: 'secretaria@moveis.com',
-    password: 'sec123',
-    name: 'Maria Secretária',
-    role: 'secretaria',
+    email: 'vendedor@moveis.com',
+    password: 'vend123',
+    name: 'Maria Vendedora',
+    role: 'vendedor',
     avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face'
   },
   {

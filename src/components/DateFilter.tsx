@@ -7,6 +7,9 @@ interface DateFilterProps {
   onStartDateChange: (date: string) => void;
   onEndDateChange: (date: string) => void;
   onReset: () => void;
+  monthOptions?: string[];
+  selectedMonth?: string;
+  onMonthChange?: (month: string) => void;
 }
 
 export const DateFilter: React.FC<DateFilterProps> = ({
@@ -14,8 +17,29 @@ export const DateFilter: React.FC<DateFilterProps> = ({
   endDate,
   onStartDateChange,
   onEndDateChange,
-  onReset
+  onReset,
+  monthOptions = [],
+  selectedMonth = 'all',
+  onMonthChange
 }) => {
+  const hasMonthFilter = monthOptions.length > 0 && typeof onMonthChange === 'function';
+
+  const formatMonthLabel = (value: string) => {
+    if (!value.includes('-')) {
+      return value;
+    }
+
+    const [year, month] = value.split('-').map(Number);
+    if (!year || !month) {
+      return value;
+    }
+
+    return new Date(year, month - 1, 1).toLocaleDateString('pt-BR', {
+      month: 'long',
+      year: 'numeric'
+    });
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700">
       <div className="flex items-center space-x-2 mb-4">
@@ -23,7 +47,7 @@ export const DateFilter: React.FC<DateFilterProps> = ({
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Filtros de Data</h3>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className={`grid grid-cols-1 ${hasMonthFilter ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-4`}>
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Data Início
@@ -47,6 +71,26 @@ export const DateFilter: React.FC<DateFilterProps> = ({
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
           />
         </div>
+
+        {hasMonthFilter && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Mês de referência
+            </label>
+            <select
+              value={selectedMonth}
+              onChange={(event) => onMonthChange?.(event.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            >
+              <option value="all">Todos os meses</option>
+              {monthOptions.map(option => (
+                <option key={option} value={option}>
+                  {formatMonthLabel(option)}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="flex items-end">
           <button
