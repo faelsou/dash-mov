@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import { 
   Plus, 
@@ -16,10 +16,71 @@ import {
 } from 'lucide-react';
 import { Lead, LeadStatus } from '../types';
 import { formatCurrency } from '../utils/calculations';
-import { useTheme } from '../contexts/ThemeContext';
+const LEADS_STORAGE_KEY = 'leads-kanban-state';
+
+const createInitialLeadsState = (): Record<LeadStatus, Lead[]> => ({
+  novo: [
+    {
+      id: '1',
+      name: 'Ana Silva',
+      email: 'ana@email.com',
+      phone: '(11) 99999-9999',
+      source: 'Website',
+      estimatedValue: 45000,
+      status: 'novo',
+      createdAt: '2024-01-15',
+      lastContact: '2024-01-15',
+      assignedTo: 'Maria Vendedora',
+      notes: 'Interessada em cozinha planejada'
+    },
+    {
+      id: '2',
+      name: 'Carlos Santos',
+      email: 'carlos@email.com',
+      phone: '(11) 88888-8888',
+      source: 'Indicação',
+      estimatedValue: 32000,
+      status: 'novo',
+      createdAt: '2024-01-16',
+      lastContact: '2024-01-16',
+      assignedTo: 'João Vendedor'
+    }
+  ],
+  contato: [
+    {
+      id: '3',
+      name: 'Mariana Costa',
+      email: 'mariana@email.com',
+      phone: '(11) 77777-7777',
+      source: 'Facebook',
+      estimatedValue: 28000,
+      status: 'contato',
+      createdAt: '2024-01-14',
+      lastContact: '2024-01-17',
+      assignedTo: 'Maria Vendedora'
+    }
+  ],
+  qualificado: [
+    {
+      id: '4',
+      name: 'Roberto Lima',
+      email: 'roberto@email.com',
+      phone: '(11) 66666-6666',
+      source: 'Google Ads',
+      estimatedValue: 55000,
+      status: 'qualificado',
+      createdAt: '2024-01-12',
+      lastContact: '2024-01-18',
+      assignedTo: 'João Vendedor'
+    }
+  ],
+  proposta: [],
+  negociacao: [],
+  fechado: [],
+  perdido: []
+});
 
 export const LeadsBoard: React.FC = () => {
-  const { theme } = useTheme();
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showNewLeadModal, setShowNewLeadModal] = useState(false);
   const [showNewVendorModal, setShowNewVendorModal] = useState(false);
@@ -45,67 +106,8 @@ export const LeadsBoard: React.FC = () => {
     'Carlos Especialista'
   ]);
 
-  const [leadsData, setLeadsData] = useState<Record<LeadStatus, Lead[]>>({
-    novo: [
-      {
-        id: '1',
-        name: 'Ana Silva',
-        email: 'ana@email.com',
-        phone: '(11) 99999-9999',
-        source: 'Website',
-        estimatedValue: 45000,
-        status: 'novo',
-        createdAt: '2024-01-15',
-        lastContact: '2024-01-15',
-        assignedTo: 'Maria Vendedora',
-        notes: 'Interessada em cozinha planejada'
-      },
-      {
-        id: '2',
-        name: 'Carlos Santos',
-        email: 'carlos@email.com',
-        phone: '(11) 88888-8888',
-        source: 'Indicação',
-        estimatedValue: 32000,
-        status: 'novo',
-        createdAt: '2024-01-16',
-        lastContact: '2024-01-16',
-        assignedTo: 'João Vendedor'
-      }
-    ],
-    contato: [
-      {
-        id: '3',
-        name: 'Mariana Costa',
-        email: 'mariana@email.com',
-        phone: '(11) 77777-7777',
-        source: 'Facebook',
-        estimatedValue: 28000,
-        status: 'contato',
-        createdAt: '2024-01-14',
-        lastContact: '2024-01-17',
-        assignedTo: 'Maria Vendedora'
-      }
-    ],
-    qualificado: [
-      {
-        id: '4',
-        name: 'Roberto Lima',
-        email: 'roberto@email.com',
-        phone: '(11) 66666-6666',
-        source: 'Google Ads',
-        estimatedValue: 55000,
-        status: 'qualificado',
-        createdAt: '2024-01-12',
-        lastContact: '2024-01-18',
-        assignedTo: 'João Vendedor'
-      }
-    ],
-    proposta: [],
-    negociacao: [],
-    fechado: [],
-    perdido: []
-  });
+  const [leadsData, setLeadsData] = useState<Record<LeadStatus, Lead[]>>(createInitialLeadsState);
+  const [initialized, setInitialized] = useState(false);
 
   const statusConfig: Record<LeadStatus, { title: string; color: string; bgColor: string }> = {
     novo: { title: 'Novos Leads', color: 'text-blue-700 dark:text-blue-300', bgColor: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700' },
@@ -138,14 +140,18 @@ export const LeadsBoard: React.FC = () => {
       const destLeads = sourceColumn === destColumn ? sourceLeads : [...newData[destColumn]];
 
       const [movedLead] = sourceLeads.splice(source.index, 1);
-      movedLead.status = destColumn;
-      destLeads.splice(destination.index, 0, movedLead);
+      const updatedLead: Lead = { ...movedLead, status: destColumn };
+      destLeads.splice(destination.index, 0, updatedLead);
 
       newData[sourceColumn] = sourceLeads;
       newData[destColumn] = destLeads;
 
       return newData;
     });
+
+    if (selectedLead?.id === draggableId) {
+      setSelectedLead(prev => (prev ? { ...prev, status: destColumn } : prev));
+    }
   };
 
   const getSourceColor = (source: string) => {
@@ -157,6 +163,39 @@ export const LeadsBoard: React.FC = () => {
       default: return 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300';
     }
   };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const savedState = localStorage.getItem(LEADS_STORAGE_KEY);
+    if (savedState) {
+      try {
+        const parsed = JSON.parse(savedState) as Partial<Record<LeadStatus, Lead[]>>;
+        const mergedState = createInitialLeadsState();
+
+        (Object.keys(mergedState) as LeadStatus[]).forEach(status => {
+          mergedState[status] = parsed[status] ?? mergedState[status];
+        });
+
+        setLeadsData(mergedState);
+        setSelectedLead(null);
+      } catch (error) {
+        console.error('Erro ao restaurar pipeline de leads:', error);
+      }
+    }
+
+    setInitialized(true);
+  }, []);
+
+  useEffect(() => {
+    if (!initialized || typeof window === 'undefined') {
+      return;
+    }
+
+    localStorage.setItem(LEADS_STORAGE_KEY, JSON.stringify(leadsData));
+  }, [leadsData, initialized]);
 
   const totalLeads = Object.values(leadsData).flat().length;
   const totalValue = Object.values(leadsData).flat().reduce((sum, lead) => sum + lead.estimatedValue, 0);
@@ -218,7 +257,11 @@ export const LeadsBoard: React.FC = () => {
                     </div>
 
                     {/* Cards */}
-                    <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto">
+                    <div
+                      className={`space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto rounded-xl border border-transparent transition-all p-1 ${
+                        snapshot.isDraggingOver ? 'border-blue-400/60 bg-blue-500/5 dark:bg-blue-500/10 shadow-inner' : ''
+                      }`}
+                    >
                       {leadsData[status as LeadStatus].map((lead, index) => (
                         <Draggable key={lead.id} draggableId={lead.id} index={index}>
                           {(provided, snapshot) => (
@@ -311,6 +354,11 @@ export const LeadsBoard: React.FC = () => {
                     {selectedLead.source}
                   </div>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status atual</label>
+                <p className="text-gray-900 dark:text-white">{statusConfig[selectedLead.status].title}</p>
               </div>
 
               <div>

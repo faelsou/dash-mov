@@ -4,16 +4,25 @@ import { ThemeContextType } from '../types';
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window !== 'undefined') {
+      const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
+      const initialTheme = savedTheme ?? 'dark';
 
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
-    if (savedTheme) {
-      setTheme(savedTheme);
+      if (typeof document !== 'undefined') {
+        document.documentElement.classList.toggle('dark', initialTheme === 'dark');
+      }
+
+      return initialTheme;
     }
-  }, []);
+    return 'dark';
+  });
 
   useEffect(() => {
+    if (typeof document === 'undefined') {
+      return;
+    }
+
     document.documentElement.classList.toggle('dark', theme === 'dark');
     localStorage.setItem('theme', theme);
   }, [theme]);

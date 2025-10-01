@@ -61,6 +61,7 @@ export interface KanbanCard {
   priority: 'alta' | 'media' | 'baixa';
   responsible: string;
   notes?: string;
+  status: ProductionStatus;
 }
 
 export interface KanbanColumn {
