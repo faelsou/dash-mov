@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
-import { 
-  Plus, 
-  Calendar, 
+import {
+  Plus,
+  Calendar,
   DollarSign, 
   User, 
   AlertCircle,
@@ -12,8 +12,9 @@ import {
   Save
 } from 'lucide-react';
 import { useSheetData } from '../hooks/useSheetData';
-import { KanbanColumn, KanbanCard, ProductionStatus } from '../types';
+import { KanbanCard, ProductionStatus } from '../types';
 import { formatCurrency } from '../utils/calculations';
+import { KanbanService } from '../services/kanban';
 const STORAGE_KEY = 'production-kanban-state';
 
 const createEmptyColumns = (): Record<ProductionStatus, KanbanCard[]> => ({
@@ -44,6 +45,11 @@ export const KanbanBoard: React.FC = () => {
   });
   const [kanbanColumns, setKanbanColumns] = useState<Record<ProductionStatus, KanbanCard[]>>(createEmptyColumns);
   const [initialized, setInitialized] = useState(false);
+  const [updatingCardId, setUpdatingCardId] = useState<string | null>(null);
+  const [updateFeedback, setUpdateFeedback] = useState<{ cardId: string; status: 'success' | 'error' } | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+
+  const kanbanService = useMemo(() => new KanbanService(), []);
 
   const statusConfig: Record<ProductionStatus, { title: string; color: string; bgColor: string }> = {
     orcamento: { title: 'Orçamento', color: 'text-yellow-700 dark:text-yellow-300', bgColor: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700' },
@@ -57,6 +63,12 @@ export const KanbanBoard: React.FC = () => {
     entrega: { title: 'Entrega', color: 'text-cyan-700 dark:text-cyan-300', bgColor: 'bg-cyan-50 dark:bg-cyan-900/20 border-cyan-200 dark:border-cyan-700' },
     finalizado: { title: 'Finalizado', color: 'text-gray-700 dark:text-gray-300', bgColor: 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-600' }
   };
+
+  const cloneColumns = (columns: Record<ProductionStatus, KanbanCard[]>) =>
+    (Object.keys(columns) as ProductionStatus[]).reduce((acc, status) => {
+      acc[status] = columns[status].map(card => ({ ...card }));
+      return acc;
+    }, {} as Record<ProductionStatus, KanbanCard[]>);
 
   const mapStatusToProduction = (status: string): ProductionStatus => {
     const statusMap: Record<string, ProductionStatus> = {
@@ -177,7 +189,7 @@ export const KanbanBoard: React.FC = () => {
     }));
   }, [kanbanColumns]);
 
-  const handleDragEnd = (result: DropResult) => {
+  const handleDragEnd = async (result: DropResult) => {
     const { destination, source, draggableId } = result;
 
     if (!destination) return;
@@ -192,23 +204,72 @@ export const KanbanBoard: React.FC = () => {
     const sourceColumn = source.droppableId as ProductionStatus;
     const destColumn = destination.droppableId as ProductionStatus;
 
-    setKanbanColumns(prev => {
-      const newColumns = { ...prev };
-      const sourceCards = [...newColumns[sourceColumn]];
-      const destCards = sourceColumn === destColumn ? sourceCards : [...newColumns[destColumn]];
+    const previousColumns = cloneColumns(kanbanColumns);
+    const nextColumns = cloneColumns(kanbanColumns);
 
-      const [movedCard] = sourceCards.splice(source.index, 1);
-      const updatedCard: KanbanCard = { ...movedCard, status: destColumn };
-      destCards.splice(destination.index, 0, updatedCard);
+    const sourceCards = nextColumns[sourceColumn];
+    const destCards = sourceColumn === destColumn ? sourceCards : nextColumns[destColumn];
 
-      newColumns[sourceColumn] = sourceCards;
-      newColumns[destColumn] = destCards;
+    const [movedCard] = sourceCards.splice(source.index, 1);
 
-      return newColumns;
-    });
+    if (!movedCard) {
+      return;
+    }
 
-    if (selectedCard?.id === draggableId) {
-      setSelectedCard(prev => (prev ? { ...prev, status: destColumn } : prev));
+    const updatedCard: KanbanCard = { ...movedCard, status: destColumn };
+    destCards.splice(destination.index, 0, updatedCard);
+
+    nextColumns[sourceColumn] = sourceCards;
+    nextColumns[destColumn] = destCards;
+
+    if (sourceColumn !== destColumn) {
+      nextColumns[destColumn] = nextColumns[destColumn].map(card =>
+        card.id === updatedCard.id ? updatedCard : { ...card, status: destColumn }
+      );
+    }
+
+    setKanbanColumns(nextColumns);
+    setUpdateError(null);
+
+    const previousSelectedCard = selectedCard;
+    if (previousSelectedCard?.id === draggableId) {
+      setSelectedCard({ ...updatedCard });
+    }
+
+    setUpdatingCardId(draggableId);
+    setUpdateFeedback(null);
+
+    const columnsToPersist =
+      sourceColumn === destColumn
+        ? [{ status: destColumn, cards: nextColumns[destColumn] }]
+        : [
+            { status: sourceColumn, cards: nextColumns[sourceColumn] },
+            { status: destColumn, cards: nextColumns[destColumn] }
+          ];
+
+    try {
+      await kanbanService.persistColumns(columnsToPersist);
+      setUpdateFeedback({ cardId: draggableId, status: 'success' });
+      if (typeof window !== 'undefined') {
+        window.setTimeout(() => {
+          setUpdateFeedback(prev => (prev?.cardId === draggableId ? null : prev));
+        }, 1500);
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar status do projeto:', error);
+      setKanbanColumns(previousColumns);
+      if (previousSelectedCard?.id === draggableId) {
+        setSelectedCard(previousSelectedCard);
+      }
+      setUpdateError('Não foi possível atualizar o status. As alterações foram revertidas.');
+      setUpdateFeedback({ cardId: draggableId, status: 'error' });
+      if (typeof window !== 'undefined') {
+        window.setTimeout(() => {
+          setUpdateFeedback(prev => (prev?.cardId === draggableId ? null : prev));
+        }, 2500);
+      }
+    } finally {
+      setUpdatingCardId(null);
     }
   };
 
@@ -265,6 +326,15 @@ export const KanbanBoard: React.FC = () => {
         </div>
       </div>
 
+      {updateError && (
+        <div className="px-6 mt-4">
+          <div className="flex items-center space-x-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800/60 dark:bg-red-900/20 dark:text-red-200">
+            <AlertCircle className="w-4 h-4" />
+            <span>{updateError}</span>
+          </div>
+        </div>
+      )}
+
       {/* Kanban Board */}
       <div className="p-6 overflow-x-auto">
         <DragDropContext onDragEnd={handleDragEnd}>
@@ -301,10 +371,25 @@ export const KanbanBoard: React.FC = () => {
                         {...provided.draggableProps}
                         {...provided.dragHandleProps}
                         onClick={() => setSelectedCard(card)}
-                        className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow cursor-pointer ${
-                          snapshot.isDragging ? 'rotate-3 shadow-lg' : ''
+                        className={`relative cursor-pointer rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-transform transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800 ${
+                          snapshot.isDragging ? 'ring-2 ring-blue-500 shadow-lg' : ''
                         }`}
                       >
+                        {updateFeedback?.cardId === card.id && updateFeedback.status === 'success' && (
+                          <div className="absolute right-2 top-2 text-green-500">
+                            <CheckCircle2 className="h-4 w-4" />
+                          </div>
+                        )}
+                        {updateFeedback?.cardId === card.id && updateFeedback.status === 'error' && (
+                          <div className="absolute right-2 top-2 text-red-500">
+                            <AlertCircle className="h-4 w-4" />
+                          </div>
+                        )}
+                        {updatingCardId === card.id && (
+                          <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-white/70 dark:bg-gray-900/70">
+                            <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+                          </div>
+                        )}
                     {/* Card Header */}
                     <div className="flex items-start justify-between mb-3">
                       <div>
