@@ -23,7 +23,7 @@ export const KPICard: React.FC<KPICardProps> = ({
 }) => {
   if (variant === 'compact') {
     return (
-      <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700 hover:shadow-md transition-all duration-300 ${className}`}>
+      <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700 hover:shadow-md transition-all duration-300 flex flex-col h-full ${className}`}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wide">{title}</h3>
           {icon && (
@@ -32,8 +32,8 @@ export const KPICard: React.FC<KPICardProps> = ({
             </div>
           )}
         </div>
-        
-        <div className="flex items-end justify-between">
+
+        <div className="flex items-end justify-between mt-auto">
           <div className="text-2xl font-bold text-gray-900 dark:text-white leading-none mb-1">
             {value}
           </div>
@@ -55,7 +55,7 @@ export const KPICard: React.FC<KPICardProps> = ({
   }
 
   return (
-    <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700 hover:shadow-lg transition-shadow duration-300 ${className}`}>
+    <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700 hover:shadow-lg transition-shadow duration-300 flex flex-col h-full ${className}`}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <p className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-2">{title}</p>
