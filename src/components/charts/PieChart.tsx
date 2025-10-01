@@ -5,19 +5,21 @@ interface PieChartProps {
   data: ChartData[];
   title: string;
   colors?: string[];
+  className?: string;
 }
 
-export const PieChart: React.FC<PieChartProps> = ({ 
-  data, 
-  title, 
-  colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#F97316']
+export const PieChart: React.FC<PieChartProps> = ({
+  data,
+  title,
+  colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#F97316'],
+  className = ''
 }) => {
   const total = data.reduce((sum, item) => sum + item.value, 0);
 
   return (
-    <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
-      <h3 className="text-lg font-semibold text-gray-900 mb-6">{title}</h3>
-      
+    <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700 ${className}`}>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">{title}</h3>
+
       <div className="flex flex-col lg:flex-row items-center space-y-6 lg:space-y-0 lg:space-x-6">
         {/* Pie Chart Visual */}
         <div className="relative">
@@ -47,8 +49,8 @@ export const PieChart: React.FC<PieChartProps> = ({
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center">
-              <div className="text-2xl font-bold text-gray-900">{data.length}</div>
-              <div className="text-sm text-gray-500">Total</div>
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">{data.length}</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">Total</div>
             </div>
           </div>
         </div>
@@ -63,8 +65,8 @@ export const PieChart: React.FC<PieChartProps> = ({
               />
               <div className="flex-1">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-700">{item.name}</span>
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{item.name}</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
                     {((item.value / total) * 100).toFixed(1)}%
                   </span>
                 </div>

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
+import { DragDropContext, Draggable, DropResult } from 'react-beautiful-dnd';
 import {
   Plus,
   Calendar,
@@ -15,6 +15,7 @@ import { useSheetData } from '../hooks/useSheetData';
 import { KanbanCard, ProductionStatus } from '../types';
 import { formatCurrency } from '../utils/calculations';
 import { KanbanService } from '../services/kanban';
+import { StrictModeDroppable } from './StrictModeDroppable';
 const STORAGE_KEY = 'production-kanban-state';
 
 const createEmptyColumns = (): Record<ProductionStatus, KanbanCard[]> => ({
@@ -340,9 +341,9 @@ export const KanbanBoard: React.FC = () => {
         <DragDropContext onDragEnd={handleDragEnd}>
           <div className="flex space-x-6 min-w-max">
           {kanbanData.map((column) => (
-            <Droppable droppableId={column.id} key={column.id}>
+            <StrictModeDroppable droppableId={column.id} key={column.id}>
               {(provided, snapshot) => (
-                <div 
+                <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
                   className="w-80 flex-shrink-0"
@@ -434,9 +435,9 @@ export const KanbanBoard: React.FC = () => {
                   </div>
                 )}
               </div>
-                </div>
+              </div>
               )}
-            </Droppable>
+            </StrictModeDroppable>
           ))}
           </div>
         </DragDropContext>

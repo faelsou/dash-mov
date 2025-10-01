@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
+import { DragDropContext, Draggable, DropResult } from 'react-beautiful-dnd';
 import { 
   Plus, 
   Phone, 
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Lead, LeadStatus } from '../types';
 import { formatCurrency } from '../utils/calculations';
+import { StrictModeDroppable } from './StrictModeDroppable';
 const LEADS_STORAGE_KEY = 'leads-kanban-state';
 
 const createInitialLeadsState = (): Record<LeadStatus, Lead[]> => ({
@@ -239,9 +240,9 @@ export const LeadsBoard: React.FC = () => {
         <DragDropContext onDragEnd={handleDragEnd}>
           <div className="flex space-x-6 min-w-max">
             {Object.entries(statusConfig).map(([status, config]) => (
-              <Droppable droppableId={status} key={status}>
+              <StrictModeDroppable droppableId={status} key={status}>
                 {(provided, snapshot) => (
-                  <div 
+                  <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
                     className="w-80 flex-shrink-0"
@@ -319,7 +320,7 @@ export const LeadsBoard: React.FC = () => {
                     </div>
                   </div>
                 )}
-              </Droppable>
+              </StrictModeDroppable>
             ))}
           </div>
         </DragDropContext>
@@ -614,12 +615,9 @@ export const LeadsBoard: React.FC = () => {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 >
                   <option value="">Selecione uma especialidade</option>
-                  <option value="Cozinhas">Cozinhas</option>
-                  <option value="Dormitórios">Dormitórios</option>
-                  <option value="Banheiros">Banheiros</option>
-                  <option value="Escritórios">Escritórios</option>
-                  <option value="Salas">Salas</option>
-                  <option value="Geral">Geral</option>
+                  <option value="B2B">B2B</option>
+                  <option value="B2C">B2C</option>
+                  <option value="Ambos B2B e B2C">Ambos B2B e B2C</option>
                 </select>
               </div>
             </div>
